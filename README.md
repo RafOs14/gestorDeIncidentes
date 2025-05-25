@@ -21,22 +21,6 @@ Este sistema permite registrar, visualizar, editar y reportar incidentes de cibe
 - SQLite3 (base de datos)
 - `ttk` para componentes visuales estilizados
 
-## 📂 Estructura del proyecto
-
-```text
-📁 proyecto/
-│
-├── db/
-│   └── init_db.py            # Script de creación e inicialización de la base de datos
-│
-├── ui/
-│   ├── incidentes_tab.py     # Pestaña de gestión de incidentes
-│   ├── users_tab.py          # Pestaña de gestión de usuarios
-│   └── reportes_tab.py       # Pestaña para generación de reportes
-│
-├── main.py                   # Archivo principal para ejecutar la aplicación
-└── README.md                 # Este archivo
-
 ## ▶️ Cómo ejecutar el sistema
 
 1. Asegúrate de tener Python 3 instalado.
@@ -60,3 +44,21 @@ Puedes modificar o agregar tipos de incidentes, estados y usuarios editando el a
 Desarrollado por: Rafael Lacuesta, Adrian Chiriff
 Materia: Introducción a las Bases de Datos
 Año: 2025
+
+## 📂 Estructura del proyecto
+
+```text
+📁 proyecto/
+│
+├── db/
+│   └── init_db.py            # Script de creación e inicialización de la base de datos
+│
+├── ui/
+│   ├── incidentes_tab.py     # Pestaña de gestión de incidentes
+│   ├── users_tab.py          # Pestaña de gestión de usuarios
+│   └── reportes_tab.py       # Pestaña para generación de reportes
+│
+├── main.py                   # Archivo principal para ejecutar la aplicación
+└── README.md                 # Este archivo
+
+
