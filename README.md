@@ -23,16 +23,19 @@ Este sistema permite registrar, visualizar, editar y reportar incidentes de cibe
 
 ## 📂 Estructura del proyecto
 
+```text
 📁 proyecto/
 │
 ├── db/
-│  └── init_db.py # Script de creación e inicialización de la base de datos
+│   └── init_db.py            # Script de creación e inicialización de la base de datos
+│
 ├── ui/
-│  └── incidentes_tab.py # Pestaña de gestión de incidentes
-│  └── users_tab.py # Pestaña de gestión de usuarios
-│  └── reportes_tab.py # Pestaña para generación de reportes
-├── main.py # Archivo principal para ejecutar la aplicación
-└── README.md # Este archivo
+│   ├── incidentes_tab.py     # Pestaña de gestión de incidentes
+│   ├── users_tab.py          # Pestaña de gestión de usuarios
+│   └── reportes_tab.py       # Pestaña para generación de reportes
+│
+├── main.py                   # Archivo principal para ejecutar la aplicación
+└── README.md                 # Este archivo
 
 ## ▶️ Cómo ejecutar el sistema
 
