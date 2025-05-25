@@ -40,10 +40,10 @@ Comparativo: Relación entre tipo de incidente y su estado actual.
 ✏️ Personalización
 Puedes modificar o agregar tipos de incidentes, estados y usuarios editando el archivo db/init_db.py.
 
-👨‍💻 Autor
-Desarrollado por: Rafael Lacuesta, Adrian Chiriff
-Materia: Introducción a las Bases de Datos
-Año: 2025
+## 👨‍💻 Autor
+- Desarrollado por: Rafael Lacuesta, Adrian Chiriff
+- Materia: Introducción a las Bases de Datos
+- Año: 2025
 
 ## 📂 Estructura del proyecto
 
