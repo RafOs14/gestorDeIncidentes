@@ -127,7 +127,7 @@ class TiposTab:
         cursor = conn.cursor()
 
         # Verificar si el tipo tiene incidentes asociados
-        cursor.execute("SELECT COUNT(*) FROM incidenteHistorico WHERE id_tipo = ?", (id_tipo,))
+        cursor.execute("SELECT COUNT(*) FROM Incidente WHERE id_tipo = ?", (id_tipo,))
         asociados = cursor.fetchone()[0]
 
         if asociados > 0:
