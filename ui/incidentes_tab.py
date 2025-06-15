@@ -34,7 +34,7 @@ class IncidentesTab:
 
         self.label_gravedad = ttk.Label(self.frame, text="Gravedad:")
         self.label_gravedad.grid(row=4, column=0, padx=5, pady=5, sticky='e')
-        self.combo_gravedad = ttk.Combobox(self.frame, state="readonly")
+        self.combo_gravedad = ttk.Combobox(self.frame, values=["Alta", "Media", "Baja"], state="readonly")
         self.combo_gravedad.grid(row=4, column=1, padx=5, pady=5, sticky='ew')
 
         btn_agregar = ttk.Button(self.frame, text="Agregar Incidente", command=self.agregar_incidente)
@@ -59,25 +59,24 @@ class IncidentesTab:
         self.frame.grid_columnconfigure(2, weight=1)
 
     def cargar_combobox_incidentes(self):
+        tipos = [
+            'Phishing', 'Malware', 'Acceso no autorizado', 'Ransomware',
+            'Ingeniería social', 'Fuga de datos', 'Ataque de denegación de servicio (DDoS)',
+            'Suplantación de identidad', 'Explotación de vulnerabilidades',
+            'Uso indebido de credenciales', 'Ataque interno (Insider Threat)',
+            'Acceso físico no autorizado', 'Pérdida o robo de dispositivo',
+            'Intrusión en red', 'Modificación no autorizada de archivos'
+        ]
+        estados = ['Abierto', 'En Proceso', 'Cerrado', 'Cancelado']
+
+        self.combo_tipo['values'] = tipos
+        self.combo_estado['values'] = estados
+
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-
-        cursor.execute("SELECT id_tipo, nombre_tipo FROM TipoIncidente")
-        tipos = cursor.fetchall()
-        self.combo_tipo['values'] = [f"{t[0]} - {t[1]}" for t in tipos]
-
-        cursor.execute("SELECT id_estado, nombre_estado FROM Estado")
-        estados = cursor.fetchall()
-        self.combo_estado['values'] = [f"{e[0]} - {e[1]}" for e in estados]
-
         cursor.execute("SELECT id_usuario, nombre FROM Usuario")
         usuarios = cursor.fetchall()
         self.combo_usuario['values'] = [f"{u[0]} - {u[1]}" for u in usuarios]
-
-        cursor.execute("SELECT id_gravedad, nivel FROM Gravedad")
-        gravedades = cursor.fetchall()
-        self.combo_gravedad['values'] = [f"{g[0]} - {g[1]}" for g in gravedades]
-
         conn.close()
 
     def cargar_incidentes(self):
@@ -87,16 +86,9 @@ class IncidentesTab:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT i.id_incidente, t.nombre_tipo, e.nombre_estado, u.nombre, i.descripcion, i.fechaCreacion, g.nivel
+            SELECT i.id_incidente, i.tipo, i.estado, u.nombre, i.descripcion, i.fecha, i.gravedad
             FROM Incidente i
-            JOIN incidenteHistorico h ON i.id_incidente = h.id_incidente
-            JOIN TipoIncidente t ON h.id_tipo = t.id_tipo
-            JOIN Estado e ON h.id_estado = e.id_estado
-            JOIN Usuario u ON h.id_usuario = u.id_usuario
-            JOIN Gravedad g ON h.id_gravedad = g.id_gravedad
-            WHERE h.id_hist = (
-                SELECT MAX(id_hist) FROM incidenteHistorico WHERE id_incidente = i.id_incidente
-            )
+            JOIN Usuario u ON i.id_usuario = u.id_usuario
             ORDER BY i.id_incidente ASC
         """)
         for row in cursor.fetchall():
@@ -105,132 +97,91 @@ class IncidentesTab:
 
     def agregar_incidente(self):
         desc = self.entry_desc.get()
-        tipo_val = self.combo_tipo.get()
-        estado_val = self.combo_estado.get()
+        gravedad = self.combo_gravedad.get()
+        tipo = self.combo_tipo.get()
+        estado = self.combo_estado.get()
         usuario_val = self.combo_usuario.get()
-        gravedad_val = self.combo_gravedad.get()
 
-        if not (desc and tipo_val and estado_val and usuario_val and gravedad_val):
-            messagebox.showwarning("Atención", "Todos los campos son obligatorios.")
+        if not (desc and gravedad and tipo and estado and usuario_val):
+            messagebox.showwarning("Atención", "Debes completar todos los campos")
             return
 
-        id_tipo = int(tipo_val.split(" - ")[0])
-        id_estado = int(estado_val.split(" - ")[0])
         id_usuario = int(usuario_val.split(" - ")[0])
-        id_gravedad = int(gravedad_val.split(" - ")[0])
         fecha = datetime.now().strftime("%Y-%m-%d")
 
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-
-        cursor.execute("INSERT INTO Incidente (descripcion, fechaCreacion) VALUES (?, ?)", (desc, fecha))
-        id_incidente = cursor.lastrowid
-
         cursor.execute("""
-            INSERT INTO incidenteHistorico (id_incidente, id_tipo, id_estado, id_gravedad, id_usuario, fecha)
+            INSERT INTO Incidente(tipo, estado, id_usuario, descripcion, fecha, gravedad)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (id_incidente, id_tipo, id_estado, id_gravedad, id_usuario, fecha))
-
+        """, (tipo, estado, id_usuario, desc, fecha, gravedad))
         conn.commit()
         conn.close()
 
-        self.limpiar_campos()
-        self.cargar_incidentes()
-        messagebox.showinfo("Éxito", "Incidente agregado correctamente.")
-
-    def seleccionar_incidente(self, event):
-        selected_item = self.tree_incidentes.selection()
-        if not selected_item:
-            return
-        values = self.tree_incidentes.item(selected_item, "values")
-        self.id_incidente_actual = values[0]
-        self.entry_desc.delete(0, tk.END)
-        self.entry_desc.insert(0, values[4])
-        self.combo_tipo.set(self.buscar_id_por_valor("TipoIncidente", values[1]))
-        self.combo_estado.set(self.buscar_id_por_valor("Estado", values[2]))
-        self.combo_usuario.set(self.buscar_id_por_valor("Usuario", values[3]))
-        self.combo_gravedad.set(self.buscar_id_por_valor("Gravedad", values[6]))
-
-    def buscar_id_por_valor(self, tabla, valor_nombre):
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
-        if tabla == "TipoIncidente":
-            id_col = "id_tipo"
-            query = "SELECT id_tipo FROM TipoIncidente WHERE nombre_tipo = ?"
-        elif tabla == "Estado":
-            id_col = "id_estado"
-            query = "SELECT id_estado FROM Estado WHERE nombre_estado = ?"
-        elif tabla == "Usuario":
-            id_col = "id_usuario"
-            query = "SELECT id_usuario FROM Usuario WHERE nombre = ?"
-        elif tabla == "Gravedad":
-            id_col = "id_gravedad"
-            query = "SELECT id_gravedad FROM Gravedad WHERE nivel = ?"
-        else:
-            conn.close()
-            return ""
-
-        cursor.execute(query, (valor_nombre,))
-        row = cursor.fetchone()
-        conn.close()
-
-        if row:
-            combo_attr = {
-                "TipoIncidente": "combo_tipo",
-                "Estado": "combo_estado",
-                "Usuario": "combo_usuario",
-                "Gravedad": "combo_gravedad"
-            }.get(tabla)
-
-            combo = getattr(self, combo_attr)
-            for val in combo["values"]:
-                if val.startswith(f"{row[0]} -"):
-                    return val
-        return ""
-
-    def actualizar_incidente(self):
-        if not hasattr(self, 'id_incidente_actual'):
-            messagebox.showwarning("Atención", "Selecciona un incidente.")
-            return
-
-        desc = self.entry_desc.get()
-        tipo_val = self.combo_tipo.get()
-        estado_val = self.combo_estado.get()
-        usuario_val = self.combo_usuario.get()
-        gravedad_val = self.combo_gravedad.get()
-
-        if not (desc and tipo_val and estado_val and usuario_val and gravedad_val):
-            messagebox.showwarning("Atención", "Todos los campos son obligatorios.")
-            return
-
-        id_tipo = int(tipo_val.split(" - ")[0])
-        id_estado = int(estado_val.split(" - ")[0])
-        id_usuario = int(usuario_val.split(" - ")[0])
-        id_gravedad = int(gravedad_val.split(" - ")[0])
-        fecha = datetime.now().strftime("%Y-%m-%d")
-
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
-        cursor.execute("UPDATE Incidente SET descripcion = ? WHERE id_incidente = ?", (desc, self.id_incidente_actual))
-        cursor.execute("""
-            INSERT INTO incidenteHistorico (id_incidente, id_tipo, id_estado, id_gravedad, id_usuario, fecha)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (self.id_incidente_actual, id_tipo, id_estado, id_gravedad, id_usuario, fecha))
-
-        conn.commit()
-        conn.close()
-
-        self.limpiar_campos()
-        self.cargar_incidentes()
-        messagebox.showinfo("Éxito", "Incidente actualizado correctamente.")
-
-    def limpiar_campos(self):
         self.entry_desc.delete(0, tk.END)
         self.combo_gravedad.set("")
         self.combo_tipo.set("")
         self.combo_estado.set("")
         self.combo_usuario.set("")
-        if hasattr(self, "id_incidente_actual"):
-            del self.id_incidente_actual
+
+        self.cargar_incidentes()
+        messagebox.showinfo("Éxito", "Incidente agregado correctamente")
+
+    def seleccionar_incidente(self, event):
+        selected_item = self.tree_incidentes.selection()
+        if not selected_item:
+            return
+
+        values = self.tree_incidentes.item(selected_item, "values")
+        self.id_incidente_actual = values[0]
+
+        self.entry_desc.delete(0, tk.END)
+        self.entry_desc.insert(0, values[4])
+        self.combo_gravedad.set(values[6])
+        self.combo_tipo.set(values[1])
+        self.combo_estado.set(values[2])
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id_usuario FROM Usuario WHERE nombre = ?", (values[3],))
+        row = cursor.fetchone()
+        conn.close()
+
+        self.combo_usuario.set(f"{row[0]} - {values[3]}" if row else "")
+
+    def actualizar_incidente(self):
+        if not hasattr(self, 'id_incidente_actual'):
+            messagebox.showwarning("Atención", "Debes seleccionar un incidente para actualizar.")
+            return
+
+        desc = self.entry_desc.get()
+        gravedad = self.combo_gravedad.get()
+        tipo = self.combo_tipo.get()
+        estado = self.combo_estado.get()
+        usuario_val = self.combo_usuario.get()
+
+        if not (desc and gravedad and tipo and estado and usuario_val):
+            messagebox.showwarning("Atención", "Debes completar todos los campos")
+            return
+
+        id_usuario = int(usuario_val.split(" - ")[0])
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE Incidente
+            SET tipo = ?, estado = ?, id_usuario = ?, descripcion = ?, gravedad = ?
+            WHERE id_incidente = ?
+        """, (tipo, estado, id_usuario, desc, gravedad, self.id_incidente_actual))
+        conn.commit()
+        conn.close()
+
+        messagebox.showinfo("Éxito", "Incidente actualizado correctamente")
+        self.cargar_incidentes()
+
+        self.entry_desc.delete(0, tk.END)
+        self.combo_gravedad.set("")
+        self.combo_tipo.set("")
+        self.combo_estado.set("")
+        self.combo_usuario.set("")
+        del self.id_incidente_actual
