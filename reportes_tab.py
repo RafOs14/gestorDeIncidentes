@@ -19,16 +19,20 @@ class ReportesTab:
         self.tab_tabular = ttk.Frame(notebook)
         self.tab_detalles = ttk.Frame(notebook)
         self.tab_resumen = ttk.Frame(notebook)
+        self.tab_comparativo = ttk.Frame(notebook)
 
         # Agregar pestañas al notebook
         notebook.add(self.tab_tabular, text="Tabular")
         notebook.add(self.tab_detalles, text="Detalles")
         notebook.add(self.tab_resumen, text="Resumen")
+        notebook.add(self.tab_comparativo, text="Comparativo")
+        
 
         # Inicializar contenido de cada pestaña
         self.inicializar_tab_tabular()
         self.inicializar_tab_detalles()
         self.inicializar_tab_resumen()
+        self.inicializar_tab_comparativo()
 
     def inicializar_tab_tabular(self):
         # Crear tabla con columnas para la vista tabular
@@ -179,4 +183,51 @@ class ReportesTab:
         """)
         for row in cursor.fetchall():
             self.tree_resumen.insert("", "end", values=row)
+        conn.close()
+        
+    def inicializar_tab_comparativo(self):
+        # Crear tabla para comparar incidentes abiertos y cerrados por tipo
+        self.tree_comparativo = ttk.Treeview(
+            self.tab_comparativo,
+            columns=("Tipo", "Total", "Cerrados", "Abiertos"),
+            show="headings"
+        )
+        for col in self.tree_comparativo["columns"]:
+            self.tree_comparativo.heading(col, text=col)
+        self.tree_comparativo.pack(expand=True, fill="both", pady=10)
+
+        # Cargar datos comparativos
+        self.cargar_comparativo()
+
+    def cargar_comparativo(self):
+        """Muestra cantidad total, abiertos y cerrados por tipo de incidente"""
+        self.tree_comparativo.delete(*self.tree_comparativo.get_children())
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                t.tipo,
+                COUNT(i.id_incidente) AS total,
+                SUM(CASE WHEN est.nombre = 'Cerrado' THEN 1 ELSE 0 END) AS cerrados,
+                SUM(CASE WHEN est.nombre != 'Cerrado' OR est.nombre IS NULL THEN 1 ELSE 0 END) AS abiertos
+            FROM Incidentes i
+            JOIN Tipos t ON i.id_tipo = t.id_tipo
+            LEFT JOIN (
+                SELECT g1.id_incidente, g1.id_estado
+                FROM Genera g1
+                JOIN (
+                    SELECT id_incidente, MAX(fecha) AS max_fecha
+                    FROM Genera
+                    GROUP BY id_incidente
+                ) g2 ON g1.id_incidente = g2.id_incidente AND g1.fecha = g2.max_fecha
+            ) ult ON i.id_incidente = ult.id_incidente
+            LEFT JOIN Estado est ON ult.id_estado = est.id_estado
+            GROUP BY t.tipo
+            ORDER BY t.tipo
+        """)
+
+        for row in cursor.fetchall():
+            self.tree_comparativo.insert("", "end", values=row)
+
         conn.close()
