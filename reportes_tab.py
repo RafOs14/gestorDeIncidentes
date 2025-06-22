@@ -6,25 +6,32 @@ from db.init_db import DB_PATH
 class ReportesTab:
     def __init__(self, root):
         self.root = root
+
+        # Crear el contenedor principal con padding
         self.frame = ttk.Frame(root, padding=10)
         self.frame.pack(expand=True, fill="both")
 
+        # Crear un notebook (pestañas)
         notebook = ttk.Notebook(self.frame)
         notebook.pack(expand=True, fill="both")
 
+        # Crear cada pestaña: Tabular, Detalles y Resumen
         self.tab_tabular = ttk.Frame(notebook)
         self.tab_detalles = ttk.Frame(notebook)
         self.tab_resumen = ttk.Frame(notebook)
 
+        # Agregar pestañas al notebook
         notebook.add(self.tab_tabular, text="Tabular")
         notebook.add(self.tab_detalles, text="Detalles")
         notebook.add(self.tab_resumen, text="Resumen")
 
+        # Inicializar contenido de cada pestaña
         self.inicializar_tab_tabular()
         self.inicializar_tab_detalles()
         self.inicializar_tab_resumen()
 
     def inicializar_tab_tabular(self):
+        # Crear tabla con columnas para la vista tabular
         self.tree_tabular = ttk.Treeview(
             self.tab_tabular,
             columns=("ID", "Tipo", "Gravedad", "Usuario", "Estado", "Fecha"),
@@ -33,12 +40,17 @@ class ReportesTab:
         for col in self.tree_tabular["columns"]:
             self.tree_tabular.heading(col, text=col)
         self.tree_tabular.pack(expand=True, fill="both", pady=10)
+
+        # Cargar datos desde la base
         self.cargar_tabular()
 
     def cargar_tabular(self):
+        """Carga datos de incidentes con estado más reciente"""
         self.tree_tabular.delete(*self.tree_tabular.get_children())
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+
+        # Obtener información del incidente, tipo, usuario que lo cargó y su estado más reciente
         cursor.execute("""
             SELECT i.id_incidente, t.tipo, t.gravedad, u.nombre, e.nombre, g.fecha
             FROM Incidentes i
@@ -62,6 +74,7 @@ class ReportesTab:
         conn.close()
 
     def inicializar_tab_detalles(self):
+        # Crear tabla con columnas para mostrar los cambios de estado
         self.tree_detalles = ttk.Treeview(
             self.tab_detalles,
             columns=("ID", "Estado Anterior", "Estado Actual", "Usuario", "Fecha", "Fecha de Cierre"),
@@ -70,12 +83,18 @@ class ReportesTab:
         for col in self.tree_detalles["columns"]:
             self.tree_detalles.heading(col, text=col)
         self.tree_detalles.pack(expand=True, fill="both", pady=10)
+
+        # Cargar los detalles de estado
         self.cargar_detalles()
 
     def cargar_detalles(self):
+        """Carga historial de cambios de estado por incidente, mostrando también la fecha de cierre si aplica"""
         self.tree_detalles.delete(*self.tree_detalles.get_children())
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+
+        # Obtener cambios de estado, usuario y fecha. Se incluye el estado anterior (si existe)
+        # y la fecha de cierre si el estado final es 'Cerrado'
         cursor.execute("""
             SELECT 
                 g_act.id_incidente,
@@ -106,19 +125,22 @@ class ReportesTab:
             ORDER BY g_act.id_incidente, g_act.fecha
         """)
         rows = cursor.fetchall()
+
+        # Insertar datos en el Treeview, mostrando vacío si no hay estado anterior o fecha de cierre
         for row in rows:
             fecha_cierre = row[5] if row[5] is not None else ""
             self.tree_detalles.insert("", "end", values=(
-                row[0],               # ID Incidente
-                row[1] if row[1] else "",  # Estado Anterior
-                row[2],               # Estado Actual
-                row[3],               # Usuario
-                row[4],               # Fecha
-                fecha_cierre          # Fecha de Cierre (si existe)
+                row[0],                          # ID Incidente
+                row[1] if row[1] else "",        # Estado Anterior
+                row[2],                          # Estado Actual
+                row[3],                          # Usuario
+                row[4],                          # Fecha
+                fecha_cierre                     # Fecha de Cierre (si aplica)
             ))
         conn.close()
 
     def inicializar_tab_resumen(self):
+        # Crear tabla para mostrar resumen por tipo de incidente
         self.tree_resumen = ttk.Treeview(
             self.tab_resumen,
             columns=("Tipo", "Cantidad", "Estados"),
@@ -127,12 +149,17 @@ class ReportesTab:
         for col in self.tree_resumen["columns"]:
             self.tree_resumen.heading(col, text=col)
         self.tree_resumen.pack(expand=True, fill="both", pady=10)
+
+        # Cargar el resumen
         self.cargar_resumen()
 
     def cargar_resumen(self):
+        """Muestra resumen de incidentes por tipo: cantidad y estados actuales"""
         self.tree_resumen.delete(*self.tree_resumen.get_children())
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+
+        # Obtener por tipo: cantidad total y estado más reciente
         cursor.execute("""
             SELECT t.tipo, COUNT(DISTINCT i.id_incidente) as total,
                 GROUP_CONCAT(DISTINCT e.nombre) as estados

@@ -1,4 +1,3 @@
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sqlite3
@@ -9,10 +8,17 @@ class IncidentesTab:
     def __init__(self, root):
         self.root = root
         self.root.title("Gestión de Incidentes")
+        
+        # Contenedor principal
         self.frame = ttk.Frame(root, padding=10)
         self.frame.pack(expand=True, fill="both")
 
-        self.tree = ttk.Treeview(self.frame, columns=("ID", "Tipo", "Gravedad", "Descripción", "Usuario", "Estado"), show="headings")
+        # Crear Treeview para mostrar incidentes
+        self.tree = ttk.Treeview(
+            self.frame,
+            columns=("ID", "Tipo", "Gravedad", "Descripción", "Usuario", "Estado"),
+            show="headings"
+        )
         column_widths = {
             "ID": 50,
             "Tipo": 100,
@@ -26,9 +32,11 @@ class IncidentesTab:
             self.tree.column(col, width=column_widths.get(col, 100), anchor="center", stretch=True)
         self.tree.pack(fill="both", expand=True, pady=10)
 
+        # Formulario para registrar incidente
         form_frame = ttk.Frame(self.frame)
         form_frame.pack(pady=10)
 
+        # Campos de selección
         ttk.Label(form_frame, text="Tipo:").grid(row=0, column=0, sticky="e")
         self.tipo_cb = ttk.Combobox(form_frame, state="readonly")
         self.tipo_cb.grid(row=0, column=1, padx=5)
@@ -51,29 +59,37 @@ class IncidentesTab:
         self.estado_cb = ttk.Combobox(form_frame, state="readonly")
         self.estado_cb.grid(row=4, column=1, padx=5)
 
+        # Botón para registrar incidente
         ttk.Button(form_frame, text="Registrar Incidente", command=self.agregar_incidente).grid(row=5, column=0, columnspan=2, pady=10)
 
+        # Botón para cambiar el estado de un incidente seleccionado
         ttk.Button(self.frame, text="Cambiar Estado del Incidente Seleccionado", command=self.cambiar_estado).pack(pady=5)
 
+        # Diccionarios para acceder a IDs desde los nombres
         self.tipos = {}
         self.usuarios = {}
         self.estados = {}
 
+        # Inicialización de los desplegables y listado de incidentes
         self.cargar_desplegables()
         self.cargar_incidentes()
 
     def cargar_desplegables(self):
+        """Carga los datos de tipos, usuarios y estados en los combobox"""
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
+        # Tipos de incidentes
         cursor.execute("SELECT id_tipo, tipo, gravedad, descripcion FROM Tipos")
         self.tipos = {tipo: (id_tipo, gravedad, descripcion) for id_tipo, tipo, gravedad, descripcion in cursor.fetchall()}
         self.tipo_cb["values"] = list(self.tipos.keys())
 
+        # Usuarios disponibles
         cursor.execute("SELECT id_usuario, nombre FROM Usuarios")
         self.usuarios = {nombre: id_usuario for id_usuario, nombre in cursor.fetchall()}
         self.usuario_cb["values"] = list(self.usuarios.keys())
 
+        # Estados posibles
         cursor.execute("SELECT id_estado, nombre FROM Estado")
         self.estados = {nombre: id_estado for id_estado, nombre in cursor.fetchall()}
         self.estado_cb["values"] = list(self.estados.keys())
@@ -81,6 +97,7 @@ class IncidentesTab:
         conn.close()
 
     def actualizar_info_tipo(self, event):
+        """Muestra gravedad y descripción del tipo seleccionado"""
         tipo = self.tipo_cb.get()
         if tipo in self.tipos:
             _, gravedad, descripcion = self.tipos[tipo]
@@ -91,9 +108,12 @@ class IncidentesTab:
             self.descripcion_text.configure(state="disabled")
 
     def cargar_incidentes(self):
+        """Carga incidentes registrados en el Treeview"""
         self.tree.delete(*self.tree.get_children())
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+
+        # Consulta para mostrar incidente con tipo, gravedad, descripción, usuario y último estado
         cursor.execute("""
             SELECT 
                 i.id_incidente, 
@@ -122,6 +142,7 @@ class IncidentesTab:
         conn.close()
 
     def agregar_incidente(self):
+        """Registra un nuevo incidente"""
         tipo = self.tipo_cb.get()
         usuario = self.usuario_cb.get()
         estado = self.estado_cb.get()
@@ -138,18 +159,22 @@ class IncidentesTab:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
+        # Insertar incidente
         cursor.execute("INSERT INTO Incidentes (id_tipo) VALUES (?)", (id_tipo,))
         id_incidente = cursor.lastrowid
 
+        # Registrar quién lo cargó y cuándo
         cursor.execute("INSERT INTO Cargan (id_usuario, id_incidente, fecha_inicio) VALUES (?, ?, ?)",
                        (id_usuario, id_incidente, fecha_actual))
 
+        # Registrar el estado inicial
         cursor.execute("INSERT INTO Genera (id_incidente, id_estado, id_usuario, fecha) VALUES (?, ?, ?, ?)",
                        (id_incidente, id_estado, id_usuario, fecha_actual))
 
         conn.commit()
         conn.close()
 
+        # Limpiar formulario
         self.tipo_cb.set("")
         self.usuario_cb.set("")
         self.estado_cb.set("")
@@ -157,9 +182,11 @@ class IncidentesTab:
         self.descripcion_text.configure(state="normal")
         self.descripcion_text.delete("1.0", tk.END)
         self.descripcion_text.configure(state="disabled")
+
         self.cargar_incidentes()
 
     def cambiar_estado(self):
+        """Cambia el estado del incidente seleccionado"""
         selected = self.tree.selection()
         if not selected:
             messagebox.showwarning("Atención", "Selecciona un incidente.")
@@ -186,9 +213,11 @@ class IncidentesTab:
         self.cargar_incidentes()
 
     def _cambiar_estado_incidente(self, id_incidente, nuevo_id_estado, id_usuario):
+        """Registra un nuevo cambio de estado para un incidente"""
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
+        # Obtener estado anterior
         cursor.execute("""
             SELECT g.id_estado, e.nombre, g.fecha
             FROM Genera g
@@ -201,12 +230,14 @@ class IncidentesTab:
         estado_anterior = resultado[1] if resultado else None
         fecha_anterior = resultado[2] if resultado else None
 
+        # Insertar nuevo estado
         fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
             INSERT INTO Genera (id_incidente, id_estado, id_usuario, fecha)
             VALUES (?, ?, ?, ?)
         """, (id_incidente, nuevo_id_estado, id_usuario, fecha_actual))
 
+        # Si es estado Cerrado, actualiza fecha de cierre
         cursor.execute("SELECT nombre FROM Estado WHERE id_estado = ?", (nuevo_id_estado,))
         nuevo_nombre_estado = cursor.fetchone()[0]
         if nuevo_nombre_estado.lower() == "cerrado":
