@@ -14,9 +14,9 @@ class UsuariosTab:
 
         # Tabla para mostrar usuarios
         self.tree = ttk.Treeview(self.frame, columns=("ID", "Nombre", "Rol"), show="headings")
-        self.tree.heading("ID", text="ID")
-        self.tree.heading("Nombre", text="Nombre")
-        self.tree.heading("Rol", text="Rol")
+        self.tree.heading("ID", text="ID", command=lambda: self.ordenar_por_columna("ID", False, self.tree))
+        self.tree.heading("Nombre", text="Nombre", command=lambda: self.ordenar_por_columna("Nombre", False, self.tree))
+        self.tree.heading("Rol", text="Rol", command=lambda: self.ordenar_por_columna("Rol", False, self.tree))
         self.tree.pack(fill="both", expand=True, pady=10)
 
         # Frame para los campos de entrada y botón
@@ -48,6 +48,22 @@ class UsuariosTab:
         for row in cursor.fetchall():
             self.tree.insert("", "end", values=row)  # Insertar cada usuario en la tabla
         conn.close()
+    
+    def ordenar_por_columna(self, col, descendente, tree=None):
+        """Ordena el contenido del Treeview por la columna seleccionada"""
+        tree = tree or self.tree
+
+        datos = [(tree.set(k, col), k) for k in tree.get_children('')]
+
+        try:
+            datos.sort(key=lambda t: int(t[0]), reverse=descendente)
+        except ValueError:
+            datos.sort(key=lambda t: t[0], reverse=descendente)
+
+        for index, (val, k) in enumerate(datos):
+            tree.move(k, '', index)
+
+        tree.heading(col, command=lambda: self.ordenar_por_columna(col, not descendente, tree))
 
     def agregar_usuario(self):
         """Agrega un nuevo usuario a la base de datos desde los campos de entrada."""
