@@ -18,22 +18,13 @@ def init_db_if_needed():
         )
     """)
 
-    # Crear tabla Tipos
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Tipos (
-            id_tipo INTEGER PRIMARY KEY AUTOINCREMENT,
-            tipo TEXT NOT NULL,
-            gravedad TEXT NOT NULL,
-            descripcion TEXT NOT NULL
-        )
-    """)
-
     # Crear tabla Incidentes
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS Incidentes (
             id_incidente INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_tipo INTEGER NOT NULL,
-            FOREIGN KEY (id_tipo) REFERENCES Tipos(id_tipo)
+            tipo TEXT NOT NULL,
+            gravedad TEXT NOT NULL,
+            descripcion TEXT NOT NULL
         )
     """)
 
@@ -77,7 +68,7 @@ def init_db_if_needed():
     for estado in estados_defecto:
         cursor.execute("INSERT OR IGNORE INTO Estado (nombre) VALUES (?)", (estado,))
 
-    # Insertar usuario admin si no existe
+    # Insertar usuarios por defecto si no existen
     cursor.execute("SELECT COUNT(*) FROM Usuarios")
     if cursor.fetchone()[0] == 0:
         usuarios = [
@@ -93,12 +84,11 @@ def init_db_if_needed():
             ("Pedro Sanchez", "Tecnico")            
         ]
         cursor.executemany("INSERT INTO Usuarios (nombre, rol) VALUES (?, ?)", usuarios)
-        
 
-    # Insertar algunos tipos de incidente si no existen
-    cursor.execute("SELECT COUNT(*) FROM Tipos")
+    # Insertar incidentes de ejemplo si no existen
+    cursor.execute("SELECT COUNT(*) FROM Incidentes")
     if cursor.fetchone()[0] == 0:
-        tipos = [
+        incidentes = [
             ("Falla eléctrica", "Alta", "Corte o sobrecarga de energía"),
             ("Problema de red", "Media", "Conectividad intermitente o caída total"),
             ("Error de software", "Baja", "Bug en el sistema reportado por el usuario"),
@@ -106,11 +96,39 @@ def init_db_if_needed():
             ("Incidente físico", "Media", "Daño o robo de hardware"),
             ("Problema de seguridad", "Alta", "Amenaza o vulnerabilidad detectada")
         ]
-        cursor.executemany("INSERT INTO Tipos (tipo, gravedad, descripcion) VALUES (?, ?, ?)", tipos)
+        cursor.executemany("INSERT INTO Incidentes (tipo, gravedad, descripcion) VALUES (?, ?, ?)", incidentes)
+        conn.commit()  # Commit para obtener IDs de incidentes
+
+        # Obtener IDs de los incidentes recién insertados
+        cursor.execute("SELECT id_incidente FROM Incidentes")
+        ids_incidentes = [row[0] for row in cursor.fetchall()]
+
+        # Obtener id del usuario admin
+        cursor.execute("SELECT id_usuario FROM Usuarios WHERE nombre = 'admin'")
+        id_usuario_admin = cursor.fetchone()[0]
+
+        # Obtener id del estado 'Nuevo'
+        cursor.execute("SELECT id_estado FROM Estado WHERE nombre = 'Nuevo'")
+        id_estado_nuevo = cursor.fetchone()[0]
+
+        from datetime import datetime
+        fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Insertar relaciones en Cargan y Genera para cada incidente
+        for id_incidente in ids_incidentes:
+            cursor.execute("""
+                INSERT INTO Cargan (id_usuario, id_incidente, fecha_inicio)
+                VALUES (?, ?, ?)
+            """, (id_usuario_admin, id_incidente, fecha_actual))
+
+            cursor.execute("""
+                INSERT INTO Genera (id_incidente, id_estado, id_usuario, fecha)
+                VALUES (?, ?, ?, ?)
+            """, (id_incidente, id_estado_nuevo, id_usuario_admin, fecha_actual))
 
     conn.commit()
     conn.close()
 
 if __name__ == "__main__":
     init_db_if_needed()
-    print("Base de datos inicializada con valores por defecto.")
+    print("Base de datos inicializada con valores por defecto y relaciones creadas.")
